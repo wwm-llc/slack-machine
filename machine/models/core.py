@@ -13,6 +13,8 @@ from machine.plugins.base import MachineBasePlugin
 class HumanHelp:
     command: str
     help: str
+    required_any_roles: list[str] = field(default_factory=list)
+    required_all_roles: list[str] = field(default_factory=list)
 
 
 @dataclass
