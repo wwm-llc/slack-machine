@@ -43,7 +43,8 @@ class PluginActions:
 class Metadata:
     plugin_actions: PluginActions = field(default_factory=PluginActions)
     required_settings: list[str] = field(default_factory=list)
-
+    required_any_roles: list[str] = field(default_factory=list)
+    required_all_roles: list[str] = field(default_factory=list)
 
 P = ParamSpec("P")
 R = TypeVar("R", covariant=True, bound=Union[Awaitable[None], MachineBasePlugin])
@@ -273,6 +274,9 @@ def require_any_role(
         wrapper.__doc__ = func.__doc__
         casted_wrapper = cast(DecoratedPluginFunc, wrapper)
         casted_wrapper.metadata = getattr(func, "metadata", Metadata())
+        if casted_wrapper.metadata.required_all_roles:
+            raise ValueError("Cannot use require_all_roles and require_any_role on the same function.")
+        casted_wrapper.metadata.required_any_roles.extend(required_roles)
         return casted_wrapper
 
     return middle
@@ -312,6 +316,11 @@ def require_all_roles(
         wrapper.__doc__ = func.__doc__
         casted_wrapper = cast(DecoratedPluginFunc, wrapper)
         casted_wrapper.metadata = getattr(func, "metadata", Metadata())
+        if casted_wrapper.metadata.required_any_roles:
+            raise ValueError("Cannot use require_all_roles and require_any_role on the same function.")
+        if casted_wrapper.metadata.required_all_roles:
+            raise ValueError("Cannot use require_all_roles twice on the same function.")
+        casted_wrapper.metadata.required_all_roles = required_roles
         return casted_wrapper
 
     return middle
