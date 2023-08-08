@@ -73,7 +73,7 @@ class RoleAwareHelp(MachineBasePlugin):
             help_text = "Help is not available!"
         else:
             help_text = "This is what I can respond to:\n\n"
-            help_text += "\n\n".join([self._gen_class_help_text(cls, fns, user_id) for cls, fns in manual.human.items() if fns])
+            help_text += "\n\n".join([await self._gen_class_help_text(cls, fns, user_id) for cls, fns in manual.human.items() if fns])
         await msg.say(help_text, ephemeral=True)
 
     @respond_to(r"^robot help$")
@@ -89,18 +89,18 @@ class RoleAwareHelp(MachineBasePlugin):
             )
         await msg.say(help_text, ephemeral=True)
 
-    def _gen_class_help_text(self, class_help: str, fn_helps: dict[str, HumanHelp], user_id: str) -> str:
+    async def _gen_class_help_text(self, class_help: str, fn_helps: dict[str, HumanHelp], user_id: str) -> str:
 
         help_text = f"*{class_help}:*\n"
         fn_help_texts = []
         for fn_help in fn_helps.values():
-            help_text = self._gen_help_text(fn_help, user_id)
+            help_text = await self._gen_help_text(fn_help, user_id)
             if help_text:
                 fn_help_texts.append(help_text)
         help_text += "\n".join(fn_help_texts)
         return help_text
 
-    def _gen_help_text(self, fn_help: HumanHelp, user_id: str) -> str | None:
+    async def _gen_help_text(self, fn_help: HumanHelp, user_id: str) -> str | None:
         if fn_help.required_any_roles:
             if not await matching_roles_by_user_id(self, user_id, fn_help.required_any_roles):
                 # User does not have a required role for this function.
