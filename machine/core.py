@@ -2,25 +2,38 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from structlog.stdlib import get_logger
 import os
 import sys
-from typing import Callable, cast, Awaitable
-from typing_extensions import Literal
 from inspect import Signature
+from typing import Awaitable, Callable, Literal, cast
 
 import dill
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from slack_sdk.socket_mode.aiohttp import SocketModeClient
 from slack_sdk.web.async_client import AsyncWebClient
+from structlog.stdlib import get_logger
 
 from machine.clients.slack import SlackClient
-from machine.handlers import create_message_handler, create_generic_event_handler, create_slash_command_handler
-from machine.models.core import Manual, HumanHelp, MessageHandler, RegisteredActions, CommandHandler
+from machine.handlers import (
+    create_generic_event_handler,
+    create_interactive_handler,
+    create_message_handler,
+    create_slash_command_handler,
+    log_request,
+)
+from machine.models.core import (
+    BlockActionHandler,
+    CommandHandler,
+    HumanHelp,
+    Manual,
+    MessageHandler,
+    RegisteredActions,
+    action_block_id_to_str,
+)
 from machine.plugins.base import MachineBasePlugin
-from machine.plugins.decorators import DecoratedPluginFunc, Metadata, MatcherConfig
-from machine.storage import PluginStorage, MachineBaseStorage
+from machine.plugins.decorators import ActionConfig, CommandConfig, DecoratedPluginFunc, MatcherConfig, Metadata
 from machine.settings import import_settings
+from machine.storage import MachineBaseStorage, PluginStorage
 from machine.utils.collections import CaseInsensitiveDict
 from machine.utils.logging import configure_logging
 from machine.utils.module_loading import import_string
@@ -138,7 +151,7 @@ class Machine:
                         logger.warning(error_msg)
                         del instance
                     else:
-                        instance.init()
+                        await instance.init()
                         logger.info("Plugin %s loaded", class_name)
         await self._storage_backend.set("manual", dill.dumps(self._help))
 
@@ -148,14 +161,12 @@ class Machine:
         missing_settings.extend(self._check_missing_settings(cls_instance_for_missing_settings))
         methods = inspect.getmembers(cls_instance, predicate=inspect.ismethod)
         for _, fn in methods:
-            missing_settings.extend(self._check_missing_settings(fn))
+            method_for_missing_settings = cast(DecoratedPluginFunc, fn)
+            missing_settings.extend(self._check_missing_settings(method_for_missing_settings))
         if missing_settings:
             return missing_settings
 
-        if cls_instance.__doc__:
-            class_help = cls_instance.__doc__.splitlines()[0]
-        else:
-            class_help = plugin_class_name
+        class_help = cls_instance.__doc__.splitlines()[0] if cls_instance.__doc__ else plugin_class_name
         self._help.human[class_help] = self._help.human.get(class_help, {})
         self._help.robot[class_help] = self._help.robot.get(class_help, [])
         for name, fn in methods:
@@ -213,8 +224,16 @@ class Machine:
                 class_name=plugin_class_name,
                 fq_fn_name=fq_fn_name,
                 function=fn,
-                command=command_config.command,
-                is_generator=command_config.is_generator,
+                command_config=command_config,
+                class_help=class_help,
+            )
+        for block_action_config in metadata.plugin_actions.actions:
+            self._register_block_action_handler(
+                class_=cls_instance,
+                class_name=plugin_class_name,
+                fq_fn_name=fq_fn_name,
+                function=fn,
+                block_action_config=block_action_config,
                 class_help=class_help,
             )
 
@@ -239,7 +258,6 @@ class Machine:
         class_help: str,
     ) -> None:
         signature = Signature.from_callable(function)
-        logger.debug("signature of message handler", signature=signature, function=fq_fn_name)
         handler = MessageHandler(
             class_=class_,
             class_name=class_name,
@@ -258,8 +276,7 @@ class Machine:
         class_name: str,
         fq_fn_name: str,
         function: Callable[..., Awaitable[None]],
-        command: str,
-        is_generator: bool,
+        command_config: CommandConfig,
         class_help: str,
     ) -> None:
         signature = Signature.from_callable(function)
@@ -269,13 +286,38 @@ class Machine:
             class_name=class_name,
             function=function,
             function_signature=signature,
-            command=command,
-            is_generator=is_generator,
+            command=command_config.command,
+            is_generator=command_config.is_generator,
         )
+        command = command_config.command
         if command in self._registered_actions.command:
             logger.warning("command was already defined, previous handler will be overwritten!", command=command)
         self._registered_actions.command[command] = handler
         # TODO: add to help
+
+    def _register_block_action_handler(
+        self,
+        class_: MachineBasePlugin,
+        class_name: str,
+        fq_fn_name: str,
+        function: Callable[..., Awaitable[None]],
+        block_action_config: ActionConfig,
+        class_help: str,
+    ) -> None:
+        signature = Signature.from_callable(function)
+        logger.debug("signature of block action handler", signature=signature, function=fq_fn_name)
+        handler = BlockActionHandler(
+            class_=class_,
+            class_name=class_name,
+            function=function,
+            function_signature=signature,
+            action_id_matcher=block_action_config.action_id,
+            block_id_matcher=block_action_config.block_id,
+        )
+        action_id = action_block_id_to_str(block_action_config.action_id)
+        block_id = action_block_id_to_str(block_action_config.block_id)
+        key = f"{fq_fn_name}-{action_id}-{block_id}"
+        self._registered_actions.block_actions[key] = handler
 
     @staticmethod
     def _parse_human_help(doc: str) -> HumanHelp:
@@ -305,15 +347,21 @@ class Machine:
 
         bot_id = self._client.bot_info["user_id"]
         bot_name = self._client.bot_info["name"]
+
+        if self._settings.get("LOGLEVEL", "ERROR").upper() == "DEBUG":
+            self._client.register_handler(log_request)
+
         message_handler = create_message_handler(
             self._registered_actions, self._settings, bot_id, bot_name, self._client
         )
         generic_event_handler = create_generic_event_handler(self._registered_actions)
         slash_command_handler = create_slash_command_handler(self._registered_actions, self._client)
+        block_action_handler = create_interactive_handler(self._registered_actions, self._client)
 
         self._client.register_handler(message_handler)
         self._client.register_handler(generic_event_handler)
         self._client.register_handler(slash_command_handler)
+        self._client.register_handler(block_action_handler)
         # Establish a WebSocket connection to the Socket Mode servers
         await self._socket_mode_client.connect()
         logger.info("Connected to Slack")

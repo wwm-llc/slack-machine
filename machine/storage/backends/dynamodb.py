@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-import calendar
 import base64
+import calendar
 import datetime
-import logging
 import typing
 from contextlib import AsyncExitStack
-from typing import Mapping, Any, cast
+from typing import Any, Mapping, cast
 
 import aioboto3
 from botocore.exceptions import ClientError
+from structlog.stdlib import get_logger
 
 if typing.TYPE_CHECKING:
     from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
+    from types_aiobotocore_dynamodb.type_defs import TimeToLiveSpecificationTypeDef
 
 
 from machine.storage.backends.base import MachineBaseStorage
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 DEFAULT_ENCODING = "utf-8"
 
 
@@ -80,7 +81,7 @@ class DynamoDBStorage(MachineBaseStorage):
                 )
                 self._table = await self._db.Table(self._table_name)
                 await self._table.wait_until_exists()
-                ttl = {"Enabled": True, "AttributeName": "sm-expire"}
+                ttl: TimeToLiveSpecificationTypeDef = {"Enabled": True, "AttributeName": "sm-expire"}
                 await self._table.meta.client.update_time_to_live(
                     TableName=self._table_name, TimeToLiveSpecification=ttl
                 )
@@ -98,7 +99,7 @@ class DynamoDBStorage(MachineBaseStorage):
 
         :param key: the SM key to prefix
         """
-        return f"{self._key_prefix}:{key}"
+        return f"{self._key_prefix}:{key}"  # noqa: E231
 
     async def has(self, key: str) -> bool:
         """

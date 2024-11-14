@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import inspect
-import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, tzinfo
-from typing import Callable, Union, cast, TypeVar, Awaitable, Any
+from typing import Any, Awaitable, Callable, Protocol, TypeVar, Union, cast
 
+from structlog.stdlib import get_logger
 from typing_extensions import ParamSpec
-from typing_extensions import Protocol
 
 from machine.plugins import ee
-from machine.plugins.admin_utils import matching_roles_by_user_id, RoleCombinator
+from machine.plugins.admin_utils import RoleCombinator, matching_roles_by_user_id
 from machine.plugins.base import MachineBasePlugin
 from machine.plugins.message import Message
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -31,12 +30,19 @@ class CommandConfig:
 
 
 @dataclass
+class ActionConfig:
+    action_id: Union[re.Pattern[str], str, None] = None
+    block_id: Union[re.Pattern[str], str, None] = None
+
+
+@dataclass
 class PluginActions:
     process: list[str] = field(default_factory=list)
     listen_to: list[MatcherConfig] = field(default_factory=list)
     respond_to: list[MatcherConfig] = field(default_factory=list)
     schedule: dict[str, Any] | None = None
     commands: list[CommandConfig] = field(default_factory=list)
+    actions: list[ActionConfig] = field(default_factory=list)
 
 
 @dataclass
@@ -50,8 +56,7 @@ R = TypeVar("R", covariant=True, bound=Union[Awaitable[None], MachineBasePlugin]
 
 
 class DecoratedPluginFunc(Protocol[P, R]):
-    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        ...
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
     metadata: Metadata
 
@@ -145,16 +150,42 @@ def command(slash_command: str) -> Callable[[Callable[P, R]], DecoratedPluginFun
     def command_decorator(f: Callable[P, R]) -> DecoratedPluginFunc[P, R]:
         fn = cast(DecoratedPluginFunc, f)
         fn.metadata = getattr(f, "metadata", Metadata())
-        if not slash_command.startswith("/"):
-            normalized_slash_command = f"/{slash_command}"
-        else:
-            normalized_slash_command = slash_command
+        normalized_slash_command = f"/{slash_command}" if not slash_command.startswith("/") else slash_command
         fn.metadata.plugin_actions.commands.append(
             CommandConfig(command=normalized_slash_command, is_generator=inspect.isasyncgenfunction(f))
         )
         return fn
 
     return command_decorator
+
+
+def action(
+    action_id: Union[re.Pattern[str], str, None] = None, block_id: Union[re.Pattern[str], str, None] = None
+) -> Callable[[Callable[P, R]], DecoratedPluginFunc[P, R]]:
+    """Respond to block actions
+
+    This decorator will enable a Plugin method to be triggered when certain block actions are
+    received. The Plugin method will be called when a block action event is received for which
+    the action_id and block_id match the provided values. action_id and block_id can be strings,
+    in which case the incoming action_id and block_id must match exactly, or regex patterns, in
+    which case the incoming action_id and block_id must match the regex pattern.
+
+    Both action_id and block_id are optional, but **at least one of them must be provided**.
+
+    :param action_id: the action_id to respond to, can be a string or regex pattern
+    :param block_id: the block_id to respond to, can be a string or regex pattern
+    :return: wrapped method
+    """
+
+    def action_decorator(f: Callable[P, R]) -> DecoratedPluginFunc[P, R]:
+        fn = cast(DecoratedPluginFunc, f)
+        fn.metadata = getattr(f, "metadata", Metadata())
+        if action_id is None and block_id is None:
+            raise ValueError("At least one of action_id or block_id must be provided")
+        fn.metadata.plugin_actions.actions.append(ActionConfig(action_id=action_id, block_id=block_id))
+        return fn
+
+    return action_decorator
 
 
 def schedule(

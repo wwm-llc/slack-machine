@@ -1,12 +1,13 @@
 from __future__ import annotations
-import logging
 
-from machine.models.core import Manual, HumanHelp
+from structlog.stdlib import get_logger
+
+from machine.models.core import HumanHelp, Manual
 from machine.plugins.base import MachineBasePlugin
-from machine.plugins.message import Message
 from machine.plugins.decorators import respond_to
+from machine.plugins.message import Message
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class HelpPlugin(MachineBasePlugin):
@@ -31,9 +32,9 @@ class HelpPlugin(MachineBasePlugin):
             help_text = "Help is not available!"
         else:
             help_text = "This is what triggers me:\n\n"
-            help_text += "\n\n".join(
-                [self._gen_class_robot_help(cls, regexes) for cls, regexes in manual.robot.items()]
-            )
+            help_text += "\n\n".join([
+                self._gen_class_robot_help(cls, regexes) for cls, regexes in manual.robot.items()
+            ])
         await msg.say(help_text)
 
     def _gen_class_help_text(self, class_help: str, fn_helps: dict[str, HumanHelp]) -> str:

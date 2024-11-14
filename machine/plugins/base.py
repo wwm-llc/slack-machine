@@ -8,12 +8,11 @@ from slack_sdk.models.blocks import Block
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.web.async_slack_response import AsyncSlackResponse
 
-from machine.utils.collections import CaseInsensitiveDict
 from machine.clients.slack import SlackClient
-from machine.models import Channel
-from machine.models import User
-from machine.storage import PluginStorage
+from machine.models import Channel, User
 from machine.plugins import ee
+from machine.storage import PluginStorage
+from machine.utils.collections import CaseInsensitiveDict
 
 
 # TODO: fix docstrings (return types are wrong, replace RST with Markdown)
@@ -43,7 +42,7 @@ class MachineBasePlugin:
         self.settings = settings
         self._fq_name = f"{self.__module__}.{self.__class__.__name__}"
 
-    def init(self) -> None:
+    async def init(self) -> None:
         """Initialize plugin
 
         This method can be implemented by concrete plugin classes. It will be called **once**
@@ -53,13 +52,25 @@ class MachineBasePlugin:
 
         :return: None
         """
-        pass
+        return None
 
     @property
     def users(self) -> dict[str, User]:
         """Dictionary of all users in the Slack workspace
 
         :return: a dictionary of all users in the Slack workspace, where the key is the user id and
+            the value is a [`User`][machine.models.user.User] object
+        """
+        return self._client.users
+
+    @property
+    def users_by_email(self) -> dict[str, User]:
+        """Dictionary of all users in the Slack workspace by email
+
+        **Note**: not every user might have an email address in their profile, so this
+        dictionary might not contain all users in the Slack workspace
+
+        :return: a dictionary of all users in the Slack workspace, where the key is the email and
             the value is a [`User`][machine.models.user.User] object
         """
         return self._client.users
@@ -100,6 +111,22 @@ class MachineBasePlugin:
             if c.name_normalized and channel_name.lower() == c.name_normalized.lower():
                 return c
         return None
+
+    def get_user_by_id(self, user_id: str) -> User | None:
+        """Get a user by their ID.
+
+        :param user_id: The ID of the user to retrieve.
+        :return: The user if found, None otherwise.
+        """
+        return self.users.get(user_id)
+
+    def get_user_by_email(self, email: str) -> User | None:
+        """Get a user by their email address.
+
+        :param email: The email address of the user to retrieve.
+        :return: The user if found, None otherwise.
+        """
+        return self._client.get_user_by_email(email)
 
     @property
     def bot_info(self) -> dict[str, Any]:
@@ -212,6 +239,78 @@ class MachineBasePlugin:
             **kwargs,
         )
 
+    async def update(
+        self,
+        channel: Channel | str,
+        ts: str,
+        text: str | None = None,
+        attachments: Sequence[Attachment] | Sequence[dict[str, Any]] | None = None,
+        blocks: Sequence[Block] | Sequence[dict[str, Any]] | None = None,
+        ephemeral_user: User | str | None = None,
+        **kwargs: Any,
+    ) -> AsyncSlackResponse:
+        """Update an existing message
+
+        Update an existing message using the WebAPI. Allows for rich formatting using
+        [blocks] and/or [attachments]. You can provide blocks and attachments as Python dicts or
+        you can use the [convenient classes] that the underlying slack client provides.
+        Can also update in-thread and ephemeral messages, visible to only one user.
+        Any extra kwargs you provide, will be passed on directly to the [`chat.update`][chat_update] request.
+
+        [attachments]: https://api.slack.com/docs/message-attachments
+        [blocks]: https://api.slack.com/reference/block-kit/blocks
+        [convenient classes]: https://github.com/slackapi/python-slack-sdk/tree/main/slack/web/classes
+        [chat_update]: https://api.slack.com/methods/chat.update
+
+        :param channel: [`Channel`][machine.models.channel.Channel] object or id of channel to send
+            message to. Can be public or private (group) channel, or DM channel.
+        :param ts: timestamp of the message to be updated.
+        :param text: message text
+        :param attachments: optional attachments (see [attachments])
+        :param blocks: optional blocks (see [blocks])
+        :param thread_ts: optional timestamp of thread, to send a message in that thread
+        :param ephemeral_user: optional user name or id if the message needs to visible
+            to a specific user only
+        :return: Dictionary deserialized from [`chat.update`](https://api.slack.com/methods/chat.update) request
+
+
+        """
+        return await self._client.update(
+            channel,
+            ts=ts,
+            text=text,
+            attachments=attachments,
+            blocks=blocks,
+            ephemeral_user=ephemeral_user,
+            **kwargs,
+        )
+
+    async def delete(
+        self,
+        channel: Channel | str,
+        ts: str,
+        **kwargs: Any,
+    ) -> AsyncSlackResponse:
+        """Delete an existing message
+
+        Delete an existing message using the WebAPI.
+        Any extra kwargs you provide, will be passed on directly to the [`chat.delete`][chat_delete] request.
+
+        [chat_delete]: https://api.slack.com/methods/chat.delete
+
+        :param channel: [`Channel`][machine.models.channel.Channel] object or id of channel to send
+            message to. Can be public or private (group) channel, or DM channel.
+        :param ts: timestamp of the message to be deleted.
+        :return: Dictionary deserialized from [`chat.delete`](https://api.slack.com/methods/chat.delete) request
+
+
+        """
+        return await self._client.delete(
+            channel,
+            ts=ts,
+            **kwargs,
+        )
+
     async def react(self, channel: Channel | str, ts: str, emoji: str) -> AsyncSlackResponse:
         """React to a message in a channel
 
@@ -321,3 +420,14 @@ class MachineBasePlugin:
         :return: response from the Slack Web API
         """
         return await self._client.unpin_message(channel, ts)
+
+    async def set_topic(self, channel: Channel | str, topic: str, **kwargs: Any) -> AsyncSlackResponse:
+        """Set channel topic
+
+        Set or update topic for the channel
+
+        :param channel: channel where topic needs to be set or updated
+        :param topic: topic for the channel (slack does not support formatting for topics)
+        :return: response from the Slack Web API
+        """
+        return await self._client.set_topic(channel, topic, **kwargs)
