@@ -194,6 +194,9 @@ class Machine:
         fq_fn_name = f"{plugin_class_name}.{fn_name}"
         if fn.__doc__:
             self._help.human[class_help][fq_fn_name] = self._parse_human_help(fn.__doc__)
+            fn_metadata = getattr(fn, "metadata", Metadata())
+            self._help.human[class_help][fq_fn_name].required_any_roles = fn_metadata.required_any_roles
+            self._help.human[class_help][fq_fn_name].required_all_roles = fn_metadata.required_all_roles
         for matcher_config in metadata.plugin_actions.listen_to:
             self._register_message_handler(
                 type_="listen_to",
