@@ -1,6 +1,6 @@
 # Slack Machine
 
-[![Join the chat at Slack](https://img.shields.io/badge/chat-slack-green?logo=slack&logoColor=white)](https://join.slack.com/t/slack-machine-chat/shared_invite/zt-1g87tzvlf-8bV_WnY3JZyaYNnRFwRd~w)
+[![Join the chat at Slack](https://img.shields.io/badge/chat-slack-green?logo=slack&logoColor=white)](https://join.slack.com/t/slack-machine-chat/shared_invite/zt-398eow0ok-mqXTOMVGlSKAcMtR53UZMQ)
 [![image](https://img.shields.io/pypi/v/slack-machine.svg)](https://pypi.python.org/pypi/slack-machine)
 [![image](https://img.shields.io/pypi/l/slack-machine.svg)](https://pypi.python.org/pypi/slack-machine)
 [![image](https://img.shields.io/pypi/pyversions/slack-machine.svg)](https://pypi.python.org/pypi/slack-machine)
@@ -29,30 +29,10 @@ class DeploymentPlugin(MachineBasePlugin):
 
 ## _Breaking Changes_
 
-**Plugin initialization is now async** (v0.35.0)
+**Dropped support for Python 3.8** (v0.38.0)
 
-The optional initialization method
-[plugins can implement](https://dondebonair.github.io/slack-machine/plugins/misc/#plugin-initialization), which is
-run once when the plugin is loaded, should be an **async** method starting the upcoming
-[v0.35.0](https://github.com/DonDebonair/slack-machine/releases/tag/v0.35.0). The reason for this is that this
-allows plugins to interact with Slack through the Slack Machine's plugin API - most of which methods are async.
-
-Simply prefix your `init()` methods with `async`.
-
-**Dropped support for Python 3.7** (v0.34.0)
-
-As of [v0.34.0](https://github.com/DonDebonair/slack-machine/releases/tag/v0.34.0), support for Python 3.7 has been
-dropped. Python 3.7 has reached end-of-life on 2023-06-27.
-
-**AsyncIO** (v0.30.0)
-
-As of [v0.30.0](https://github.com/DonDebonair/slack-machine/releases/tag/v0.30.0) Slack Machine dropped support for
-the old backend based on the RTM API. As such, Slack Machine is now fully based on
-[AsyncIO](https://docs.python.org/3/library/asyncio.html). This means plugins written before the rewrite to asyncio
-aren't supported anymore. See [here](https://dondebonair.github.io/slack-machine/migrating/) for a migration guide to
-get your old plugins working with the new version of Slack Machine.
-
-It's really easy!
+As of [v0.38.0](https://github.com/DonDebonair/slack-machine/releases/tag/v0.38.0), support for Python 3.8 has been
+dropped. Python 3.8 has reached end-of-life on 2024-10-07.
 
 ## Features
 
@@ -79,6 +59,7 @@ It's really easy!
 - Support for [blocks](https://api.slack.com/reference/block-kit/blocks)
 - Support for [message attachments](https://api.slack.com/docs/message-attachments) [Legacy 🏚]
 - Support for [interactive elements](https://api.slack.com/block-kit)
+- Support for [modals](https://api.slack.com/surfaces/modals)
 - Listen and respond to any [Slack event](https://api.slack.com/events) supported by the Events API
 - Store and retrieve any kind of data in persistent storage (currently Redis, DynamoDB, SQLite, and in-memory storage
   are supported)
@@ -88,6 +69,10 @@ It's really easy!
 
 ### Coming Soon
 
-- Support for modals
 - Support for shortcuts
 - ... and much more
+
+### Examples
+
+There is an example plugin that shows off many of the features of Slack Machine:
+[Slack Machine Kitchensink Plugin](https://github.com/DonDebonair/sm-kitchensink-plugin)

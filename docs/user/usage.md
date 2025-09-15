@@ -155,6 +155,7 @@ The storage will be persisted in a set of files.  Removing these files will rese
 *Class*: `machine.storage.backends.shelve.ShelfStorage`
 
 #### Redis:
+Install with: `uv add 'slack-machine[redis]'`
 
 This backend stores data in [Redis](https://redis.io/). Redis is a very fast key-value store that is super easy to
 install and operate. This backend is recommended, because it will persist data between restarts. The Redis backend
@@ -176,7 +177,7 @@ Optional parameters:
 
 #### DynamoDB
 
-Install with: `pip install 'slack-machine[dynamodb]'`
+Install with: `uv add 'slack-machine[dynamodb]'`
 
 This backend stores data in [DynamoDB](https://aws.amazon.com/dynamodb/). DynamoDB is a managed NoSQL datastore on AWS
 that, among other things, allows for easy persistance of objects by key. The DynamoDB backend requires either a set of
@@ -198,7 +199,7 @@ Optional parameters:
 
 #### SQLite
 
-Install with: `pip install 'slack-machine[sqlite]'`
+Install with: `uv add 'slack-machine[sqlite]'`
 
 This backend stores data in [SQLite](https://www.sqlite.org/). SQLite is a C library that provides a lightweight
 disk-based database that doesn’t require a separate server process and allows accessing the database using a

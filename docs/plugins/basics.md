@@ -42,9 +42,10 @@ decorator to listen for specific messages. Then we can create our plugin class t
 that listens for The Answer, and responds to it:
 
 ```python
-from machine.plugins.base import MachineBasePlugin
-from machine.plugins.decorators import listen_to
+from src.machine.plugins.base import MachineBasePlugin
+from src.machine import listen_to
 import re
+
 
 class UltimateQuestionPlugin(MachineBasePlugin):
 
@@ -88,3 +89,8 @@ $ slack-machine
 ```
 
 That's all there is to it!
+
+## Examples
+
+There is an example plugin that shows off many of the features of Slack Machine:
+[Slack Machine Kitchensink Plugin](https://github.com/DonDebonair/sm-kitchensink-plugin)

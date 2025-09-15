@@ -38,6 +38,7 @@ nav:
       - 'plugins/slash-commands.md'
       - 'plugins/interacting.md'
       - 'plugins/block-kit-actions.md'
+      - 'plugins/modals.md'
       - 'plugins/settings.md'
       - 'plugins/storage.md'
       - 'plugins/misc.md'
@@ -61,10 +62,12 @@ plugins:
       handlers:
         python:
           options:
-            docstring_style: sphinx
-            show_root_heading: yes
-            show_signature_annotations: yes
+            docstring_style: google
+            show_root_heading: true
+            show_signature_annotations: true
             members_order: source
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
           import:
             - https://docs.python.org/dev/objects.inv
-            - https://slack.dev/python-slack-sdk/objects.inv
+            - https://apscheduler.readthedocs.io/en/stable/objects.inv

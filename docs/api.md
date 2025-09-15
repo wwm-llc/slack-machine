@@ -18,6 +18,10 @@ The following classes form the basis for Plugin development.
 
 ### ::: machine.plugins.block_action.BlockAction
 
+### ::: machine.plugins.modals.ModalSubmission
+
+### ::: machine.plugins.modals.ModalClosure
+
 
 ## Decorators
 
@@ -33,6 +37,16 @@ These classes represent base objects from the Slack API
 ### ::: machine.models.user.User
 
 ### ::: machine.models.channel.Channel
+
+### ::: machine.models.interactive.BlockActionsPayload
+
+### ::: machine.models.interactive.Action
+
+### ::: machine.models.interactive.ViewSubmissionPayload
+
+### ::: machine.models.interactive.View
+
+### ::: machine.models.interactive.State
 
 ## Storage
 
