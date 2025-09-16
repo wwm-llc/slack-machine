@@ -45,3 +45,5 @@ class PluginActions:
 class Metadata:
     plugin_actions: PluginActions = field(default_factory=PluginActions)
     required_settings: list[str] = field(default_factory=list)
+    required_any_roles: list[str] = field(default_factory=list)
+    required_all_roles: list[str] = field(default_factory=list)
